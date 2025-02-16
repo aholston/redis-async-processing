@@ -11,13 +11,12 @@ function App() {
   const [imageUrl, setImageUrl] = useState(null);
 
   const uploadImage = async () => {
-    console.log("Here");
     const formData = new FormData();
     formData.append("image", file);
 
     console.log(formData)
 
-    const response = await axios.post("http://localhost:5002/upload", formData);
+    const response = await axios.post("https://image-processing-env.eba-xirebtut.us-east-1.elasticbeanstalk.com/upload", formData);
     setJobId(response.data.jobId);
     setStatus("Processing...");
   };

@@ -4,9 +4,17 @@ const mongoose = require("mongoose");
 const multer = require("multer");
 const sharp = require("sharp");
 const path = require("path");
+const http = require("http");
+const { Server } = require("socket.io");
+const cors = require("cors");
+
 
 const app = express();
+app.use(cors()); // Enable CORS for development
 const PORT = 5002;
+
+const server = http.createServer(app);
+const io = new Server(server);
 
 mongoose.connect("mongodb://localhost:27017/async-images")
   .then(() => console.log("✅ Connected to MongoDB"))
@@ -50,18 +58,38 @@ app.get("/status/:jobId", async (req, res) => {
 
 
 imageProcessingQueue.process(async (job) => {
-  console.log(`🖼️ Processing image: ${job.data.filePath}`);
+  try {
+    console.log(`🖼️ Processing image: ${job.data.filePath}`);
 
-  const outputFile = `processed/${path.basename(job.data.filePath)}.jpg`;
-  await sharp(job.data.filePath)
-    .resize(200) // Resize to 200px width
-    .toFile(outputFile);
+    if (!job.data.filePath) {
+      throw new Error("File path is missing!");
+    }
 
-  await Image.findOneAndUpdate({ jobId: job.id }, { status: "completed", imageUrl: outputFile });
+    // Simulate image processing (Replace this with actual logic)
+    await new Promise((resolve) => setTimeout(resolve, 5000));
 
-  console.log(`✅ Image processed & saved as ${outputFile}`);
+    await Image.findOneAndUpdate({ jobId: job.id }, { 
+      status: "completed", 
+      imageUrl: job.data.filePath 
+    });
+
+    console.log(`✅ Image processed successfully: ${job.data.filePath}`);
+  } catch (error) {
+    console.error(`❌ Image processing failed: ${error.message}`);
+
+    await Image.findOneAndUpdate({ jobId: job.id }, { 
+      status: "failed", 
+      errorMessage: error.message 
+    });
+  }
 });
 
+
+imageProcessingQueue.on("completed", async (job) => {
+  const image = await Image.findOne({ jobId: job.id });
+
+  io.emit("jobCompleted", { jobId: job.id, imageUrl: image.imageUrl });
+});
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);

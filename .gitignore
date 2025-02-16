@@ -14,3 +14,4 @@ yarn-error.log*
 # Ignore OS-specific files
 .DS_Store
 Thumbs.db
+node_modules/

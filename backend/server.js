@@ -6,7 +6,7 @@ const uploadRoutes = require("./routes/uploadRoutes");
 const statusRoutes = require("./routes/statusRoutes");
 
 const app = express();
-const PORT = 5002;
+const PORT = process.env.PORT || 8080; 
 
 mongoose.connect("mongodb://localhost:27017/async-images")
   .then(() => console.log("✅ Connected to MongoDB"))
@@ -20,5 +20,5 @@ app.use("/upload", uploadRoutes);
 app.use("/status", statusRoutes);
 
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
-});
+    console.log(`🚀 Server running on port ${PORT}`);
+  });

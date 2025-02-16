@@ -1,22 +1,17 @@
-const mongoose = require("mongoose");  // <-- Add this
+const mongoose = require("mongoose");
 const { imageProcessingQueue } = require("../services/redisQueue");
 const Image = require("../models/imageModel");
 const sharp = require("sharp");
 const path = require("path");
 const fs = require("fs");
+const { uploadToS3 } = require("../services/s3Uploader");
+require("dotenv").config();
 
-const processedDir = "processed"; 
-
-if (!fs.existsSync(processedDir)) {
-  fs.mkdirSync(processedDir, { recursive: true });
-}
-
-// ✅ Ensure MongoDB is connected
+// Connect to MongoDB
 mongoose.connect("mongodb://localhost:27017/async-images", {
   useNewUrlParser: true,
   useUnifiedTopology: true
-})
-  .then(() => console.log("✅ Worker connected to MongoDB"))
+}).then(() => console.log("✅ Worker connected to MongoDB"))
   .catch(err => console.error("❌ MongoDB Connection Error:", err));
 
 imageProcessingQueue.process(async (job) => {
@@ -27,15 +22,24 @@ imageProcessingQueue.process(async (job) => {
       throw new Error("File path is missing!");
     }
 
-    const outputFile = `${processedDir}/${path.basename(job.data.filePath)}.jpg`;
-    
+    const fileName = `${path.basename(job.data.filePath)}.jpg`;
+    const processedPath = `processed/${fileName}`;
+
+    // Resize image using Sharp
     await sharp(job.data.filePath)
       .resize(200)
-      .toFile(outputFile);
+      .toFile(processedPath);
 
-    await Image.findOneAndUpdate({ jobId: job.id }, { status: "completed", imageUrl: outputFile });
+    // Upload to S3
+    const s3Url = await uploadToS3(processedPath, fileName);
 
-    console.log(`✅ Image processed & saved as ${outputFile}`);
+    // Update MongoDB with S3 URL
+    await Image.findOneAndUpdate({ jobId: job.id }, { status: "completed", imageUrl: s3Url });
+
+    console.log(`✅ Image processed & uploaded to S3: ${s3Url}`);
+
+    // Cleanup local file after upload
+    fs.unlinkSync(processedPath);
   } catch (error) {
     console.error(`❌ Image processing failed: ${error.message}`);
 
